@@ -18,12 +18,10 @@ class R1Filter(Star):
                 if len(response.raw_completion.choices) \
                         and response.raw_completion.choices[0].message:
                     message = response.raw_completion.choices[0].message
-                    reasoning_content = ""  # 初始化 reasoning_content
+                    reasoning_content = "" 
 
-                    # 检查 Groq deepseek-r1-distill-llama-70b模型的 'reasoning' 属性
                     if hasattr(message, 'reasoning') and message.reasoning:
                         reasoning_content = message.reasoning
-                    # 检查 DeepSeek deepseek-reasoner模型的 'reasoning_content'
                     elif hasattr(message, 'reasoning_content') and message.reasoning_content:
                         reasoning_content = message.reasoning_content
 
@@ -31,13 +29,26 @@ class R1Filter(Star):
                         response.completion_text = f"🤔思考：{reasoning_content}\n\n{message.content}"
                     else:
                         response.completion_text = message.content
-                    
         else: 
-            # DeepSeek 官方的模型的思考存在了 reason_content 字段因此不需要过滤
             completion_text = response.completion_text
-            # 适配 ollama deepseek-r1 模型
-            if r'<think>' in completion_text or r'</think>' in completion_text:
-                completion_text = re.sub(r'<think>.*?</think>', '', completion_text, flags=re.DOTALL).strip()
-                # 可能有单标签情况
-                completion_text = completion_text.replace(r'<think>', '').replace(r'</think>', '').strip()
+            
+            # 清除完整标签对和孤立闭合标签
+            completion_text = re.sub(
+                r'(<think>.*?</think>|.*?</think>)', 
+                '', 
+                completion_text, 
+                flags=re.DOTALL|re.IGNORECASE
+            ).strip()
+
+            # 清理残留标签
+            completion_text = re.sub(
+                r'</?\s*think\s*/?>',  # 匹配所有变体标签
+                '', 
+                completion_text, 
+                flags=re.IGNORECASE
+            ).strip()
+
+        
+            completion_text = re.sub(r'\n{2,}', '\n', completion_text)
+            
             response.completion_text = completion_text
